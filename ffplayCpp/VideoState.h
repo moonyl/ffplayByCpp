@@ -17,6 +17,7 @@ struct SDL_Window;
 struct SDL_Renderer;
 class Decoder;
 struct SwsContext;
+struct SwrContext;
 
 // TODO : make this into class
 struct AudioParams {
@@ -80,6 +81,7 @@ private:
 	void setClockAt(Clock &c, double pts, int serial, double time);
 	void syncClockToSlave(Clock &c, Clock &slave);
 	void updateSampleDisplay(short *samples, int sampleSize);
+	int synchronizeAudio(int nbSamples);
 	int audioDecodeFrame();
 	void seekStream(int64_t pos, int64_t rel, int seekByBytes);
 	void refreshVideo(double &remainingTime);
@@ -241,6 +243,12 @@ private:	// members should be zero on creating
 
 	SwsContext *m_subConvertCtx = nullptr;
 	SwsContext *m_imgConvertCtx = nullptr;
+
+	SwrContext *m_swrCtx = nullptr;
+	double m_audioDiffCum;
+
+	unsigned int m_audioBuf1Size = 0;
+	uint8_t *m_audioBuf1 = nullptr;
 
 	std::unique_ptr<Decoder> m_audDec;
 	std::unique_ptr<Decoder> m_vidDec;

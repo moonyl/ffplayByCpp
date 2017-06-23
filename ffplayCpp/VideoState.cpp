@@ -11,6 +11,7 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libavcodec/avfft.h>
 #include <libswscale/swscale.h>
+#include <libswresample/swresample.h>
 }
 
 #include "Decoder.h"
@@ -512,7 +513,7 @@ int VideoState::openAudio(int64_t wantedChannelLayout, int wantedNbChannels, int
 	wantedSpec.freq = wantedSampleRate;
 	if (wantedSpec.freq <= 0 || wantedSpec.channels <= 0) {
 		av_log(nullptr, AV_LOG_ERROR, "Invaild sample rate or channel count!\n");
-return -1;
+		return -1;
 	}
 
 	while (nextSampleRateIdx && nextSampleRates[nextSampleRateIdx] >= wantedSpec.freq) {
@@ -597,6 +598,43 @@ void VideoState::updateSampleDisplay(short * samples, int sampleSize)
 	}
 }
 
+int VideoState::synchronizeAudio(int nbSamples)
+{
+	int wantedNbSamples = nbSamples;
+	const int SAMPLE_CORRECTION_PERCENT_MAX = 10;
+
+	if (masterSyncType() != Clock::AV_SYNC_AUDIO_MASTER) {
+		double diff, avgDiff;
+		int minNbSamples, maxNbSamples;
+
+		diff = m_audClk.getClock() - getMasterClock();
+
+		if (!isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD) {
+			m_audioDiffCum = diff + m_audioDiffAvgCoef * m_audioDiffCum;
+			if (m_audioDiffAvgCount < AUDIO_DIFF_AVG_NB) {
+				m_audioDiffAvgCount++;
+			}
+			else {
+				avgDiff = m_audioDiffCum * (1.0 - m_audioDiffAvgCoef);
+
+				if (fabs(avgDiff) >= m_audioDiffThreshold) {
+					wantedNbSamples = nbSamples + (int)(diff * m_audioSrc.freq);
+					minNbSamples = ((nbSamples * (100 - SAMPLE_CORRECTION_PERCENT_MAX) / 100));
+					maxNbSamples = ((nbSamples * (100 + SAMPLE_CORRECTION_PERCENT_MAX) / 100));
+					wantedNbSamples = av_clip(wantedNbSamples, minNbSamples, maxNbSamples);
+				}
+				av_log(nullptr, AV_LOG_TRACE, "diff=%f adiff=%f sample_diff=%d apts=%0.3f %f\n",
+					diff, avgDiff, wantedNbSamples = nbSamples, m_audioClock, m_audioDiffThreshold);
+			}
+		}
+		else {
+			m_audioDiffAvgCount = 0;
+			m_audioDiffCum = 0;
+		}
+	}
+	return wantedNbSamples;
+}
+
 int VideoState::audioDecodeFrame()
 {
 	int dataSize, resampledDataSize;
@@ -627,9 +665,87 @@ int VideoState::audioDecodeFrame()
 	dataSize = av_samples_get_buffer_size(nullptr, af->channels(), af->nbSamples(), af->frameFormat(), 1);
 	decChannelLayout = (af->channelLayout() && af->channels() == av_get_channel_layout_nb_channels(af->channelLayout()) ?
 		af->channelLayout() : av_get_default_channel_layout(af->channels()));
+	wantedNbSamples = synchronizeAudio(af->frame()->nb_samples);
 
+	if (af->frameFormat() != m_audioSrc.fmt ||
+		decChannelLayout != m_audioSrc.channelLayout ||
+		af->frame()->sample_rate != m_audioSrc.freq ||
+		(wantedNbSamples != af->frame()->nb_samples && !m_swrCtx)) {
+		swr_free(&m_swrCtx);
+		m_swrCtx = swr_alloc_set_opts(nullptr,
+			m_audioTgt.channelLayout, m_audioTgt.fmt, m_audioTgt.freq,
+			decChannelLayout, af->frameFormat(), af->frame()->sample_rate, 0, nullptr);
+		if (!m_swrCtx || swr_init(m_swrCtx) < 0) {
+			av_log(nullptr, AV_LOG_ERROR,
+				"Cannot create sample rate converter for conversion of %d Hz %s %d channels to %d Hz %s %d channels!\n",
+				af->frame()->sample_rate, av_get_sample_fmt_name(af->frameFormat()), af->frame()->channels,
+				m_audioTgt.freq, av_get_sample_fmt_name(m_audioTgt.fmt), m_audioTgt.channels);
+			swr_free(&m_swrCtx);
+			return -1;
+		}
+		m_audioSrc.channelLayout = decChannelLayout;
+		m_audioSrc.channels = af->frame()->channels;
+		m_audioSrc.freq = af->frame()->sample_rate;
+		m_audioSrc.fmt = af->frameFormat();
+	}
 
-	return 0;
+	if (m_swrCtx) {
+		const uint8_t **in = (const uint8_t **)af->frame()->extended_data;
+		uint8_t **out = &m_audioBuf1;
+		int outCount = (int64_t)wantedNbSamples * m_audioTgt.freq / af->frame()->sample_rate + 256;
+		int outSize = av_samples_get_buffer_size(nullptr, m_audioTgt.channels, outCount, m_audioTgt.fmt, 0);
+		int len2;
+		if (outSize < 0) {
+			av_log(nullptr, AV_LOG_ERROR, "av_samples_get_buffer_size() failed\n");
+			return -1;
+		}
+		if (wantedNbSamples != af->frame()->nb_samples) {
+			if (swr_set_compensation(m_swrCtx, (wantedNbSamples - af->frame()->nb_samples) * m_audioTgt.freq / af->frame()->sample_rate,
+				wantedNbSamples * m_audioTgt.freq / af->frame()->sample_rate) < 0) {
+				av_log(nullptr, AV_LOG_ERROR, "swr_set_compenstation() failed\n");
+				return -1;
+			}
+		}
+		av_fast_malloc(&m_audioBuf1, &m_audioBuf1Size, outSize);
+		if (!m_audioBuf1) {
+			return AVERROR(ENOMEM);
+		}
+		len2 = swr_convert(m_swrCtx, out, outCount, in, af->frame()->nb_samples);
+		if (len2 < 0) {
+			av_log(nullptr, AV_LOG_ERROR, "swr_convert() failed\n");
+			return -1;
+		}
+		if (len2 == outCount) {
+			av_log(nullptr, AV_LOG_WARNING, "audio buffer is probably too small\n");
+			if (swr_init(m_swrCtx) < 0) {
+				swr_free(&m_swrCtx);
+			}
+		}
+		m_audioBuf = m_audioBuf1;
+		resampledDataSize = len2 * m_audioTgt.channels * av_get_bytes_per_sample(m_audioTgt.fmt);
+	}
+	else {
+		m_audioBuf = af->frame()->data[0];
+		resampledDataSize = dataSize;
+	}
+
+	audioClock0 = m_audioClock;
+	if (!isnan(af->pts())) {
+		m_audioClock = af->pts() + (double)af->frame()->nb_samples / af->frame()->sample_rate;
+	}
+	else {
+		m_audioClock = NAN;
+	}
+	m_audioClockSerial = af->serial();
+#ifdef DEBUG
+	{
+		static double lastClock;
+		printf("audio: delay=%0.3f clock=%0.3f clock0=%0.3f\n",
+			m_audioClock - lastClock, m_audioClock, audioClock0);
+		lastClock = m_audioClock;
+	}
+#endif
+	return resampledDataSize;
 }
 
 void VideoState::seekStream(int64_t pos, int64_t rel, int seekByBytes)
@@ -1722,8 +1838,8 @@ void VideoState::sdlAudioCallback(void * opaque, Uint8 * stream, int len)
 			else {
 				if (is->m_showMode != SHOW_MODE_VIDEO) {
 					is->updateSampleDisplay((int16_t *)is->m_audioBuf, audioSize);
-					is->m_audioBufSize = audioSize;
 				}
+				is->m_audioBufSize = audioSize;				
 			}
 			is->m_audioBufIndex = 0;
 		}
@@ -1737,7 +1853,7 @@ void VideoState::sdlAudioCallback(void * opaque, Uint8 * stream, int len)
 		else {
 			memset(stream, 0, len1);
 			if (!is->m_muted && is->m_audioBuf) {
-				SDL_MixAudio(stream, (uint8_t *)is->m_audioBufSize + is->m_audioBufIndex, len1, is->m_audioVolume);
+				SDL_MixAudio(stream, (uint8_t *)is->m_audioBuf + is->m_audioBufIndex, len1, is->m_audioVolume);
 			}
 		}
 		len -= len1;
