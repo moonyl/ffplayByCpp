@@ -659,18 +659,18 @@ int VideoState::audioDecodeFrame()
 		if (!(af = m_sampleQ.peekReadable())) {
 			return -1;
 		}
-
+		m_sampleQ.next();
 	} while (af->serial() != m_audioQ.serial());
 
 	dataSize = av_samples_get_buffer_size(nullptr, af->channels(), af->nbSamples(), af->frameFormat(), 1);
 	decChannelLayout = (af->channelLayout() && af->channels() == av_get_channel_layout_nb_channels(af->channelLayout()) ?
 		af->channelLayout() : av_get_default_channel_layout(af->channels()));
-	wantedNbSamples = synchronizeAudio(af->frame()->nb_samples);
+	wantedNbSamples = synchronizeAudio(af->nbSamples());
 
 	if (af->frameFormat() != m_audioSrc.fmt ||
 		decChannelLayout != m_audioSrc.channelLayout ||
 		af->frame()->sample_rate != m_audioSrc.freq ||
-		(wantedNbSamples != af->frame()->nb_samples && !m_swrCtx)) {
+		(wantedNbSamples != af->nbSamples() && !m_swrCtx)) {
 		swr_free(&m_swrCtx);
 		m_swrCtx = swr_alloc_set_opts(nullptr,
 			m_audioTgt.channelLayout, m_audioTgt.fmt, m_audioTgt.freq,
