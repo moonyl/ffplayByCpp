@@ -1847,7 +1847,7 @@ void VideoState::sdlAudioCallback(void * opaque, Uint8 * stream, int len)
 		if (len1 > len) {
 			len1 = len;
 		}
-		if (!is->m_muted && is->m_audioBufIndex && is->m_audioVolume == SDL_MIX_MAXVOLUME) {
+		if (!is->m_muted && is->m_audioBuf && is->m_audioVolume == SDL_MIX_MAXVOLUME) {
 			memcpy(stream, (uint8_t *)is->m_audioBuf + is->m_audioBufIndex, len1);
 		}
 		else {
@@ -1857,7 +1857,7 @@ void VideoState::sdlAudioCallback(void * opaque, Uint8 * stream, int len)
 			}
 		}
 		len -= len1;
-		stream + len1;
+		stream += len1;
 		is->m_audioBufIndex += len1;
 	}
 	is->m_audioWriteBufSize = is->m_audioBufSize - is->m_audioBufIndex;
