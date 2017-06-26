@@ -64,6 +64,12 @@ private:
 		SAMPLE_ARRAY_SIZE = (8 * 65536)
 	};
 	
+	enum {
+		AV_SYNC_AUDIO_MASTER, /* default choice */
+		AV_SYNC_VIDEO_MASTER,
+		AV_SYNC_EXTERNAL_CLOCK, /* synchronize to an external clock */
+	};
+
 public:
 	int masterSyncType() const;
 	double getMasterClock() const;
@@ -132,7 +138,7 @@ private:	// members should be zero on creating
 	int m_audioClockSerial = -1;
 	int m_audioVolume = 100;	// TODO : need to clip
 	
-	int m_avSyncType = Clock::AV_SYNC_AUDIO_MASTER;
+	int m_avSyncType = AV_SYNC_AUDIO_MASTER;
 
 	SDL_Thread *m_readTid = nullptr;
 

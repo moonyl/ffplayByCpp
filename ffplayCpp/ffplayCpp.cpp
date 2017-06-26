@@ -177,8 +177,8 @@ int main(int argc, char *args[])
 {
 	FfPlayCpp app;
 
-	//const char* inputFile = "D:/video/I_ll_Be_Yours.mp4";
-	const char* inputFile = "http://169.56.73.204/hls/test.m3u8";
+	const char* inputFile = "D:/video/I_ll_Be_Yours.mp4";
+	//const char* inputFile = "http://169.56.73.204/hls/test.m3u8";
 	AVInputFormat *inputFormat = NULL;
 	app.openStream(inputFile, inputFormat);
 	//show_help_demuxer();

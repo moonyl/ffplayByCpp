@@ -8,12 +8,6 @@ public:
 	Clock(const int &queueSerial);
 	~Clock();
 
-	enum {
-		AV_SYNC_AUDIO_MASTER, /* default choice */
-		AV_SYNC_VIDEO_MASTER,
-		AV_SYNC_EXTERNAL_CLOCK, /* synchronize to an external clock */
-	};
-
 public:
 	double getClock() const;
 	void setClockAt(double pts, int serial, double time);

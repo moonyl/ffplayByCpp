@@ -92,24 +92,24 @@ VideoState::~VideoState()
 
 int VideoState::masterSyncType() const
 {
-	if (m_avSyncType == Clock::AV_SYNC_VIDEO_MASTER) {
+	if (m_avSyncType == AV_SYNC_VIDEO_MASTER) {
 		if (m_videoSt) {
-			return Clock::AV_SYNC_VIDEO_MASTER;
+			return AV_SYNC_VIDEO_MASTER;
 		}
 		else {
-			return Clock::AV_SYNC_AUDIO_MASTER;
+			return AV_SYNC_AUDIO_MASTER;
 		}
 	}
-	else if (m_avSyncType == Clock::AV_SYNC_AUDIO_MASTER) {
+	else if (m_avSyncType == AV_SYNC_AUDIO_MASTER) {
 		if (m_audioSt) {
-			return Clock::AV_SYNC_AUDIO_MASTER;
+			return AV_SYNC_AUDIO_MASTER;
 		}
 		else {
-			return Clock::AV_SYNC_EXTERNAL_CLOCK;
+			return AV_SYNC_EXTERNAL_CLOCK;
 		}
 	}
 
-	return Clock::AV_SYNC_EXTERNAL_CLOCK;
+	return AV_SYNC_EXTERNAL_CLOCK;
 }
 
 double VideoState::getMasterClock() const
@@ -117,10 +117,10 @@ double VideoState::getMasterClock() const
 	double val;
 
 	switch (masterSyncType()) {
-	case Clock::AV_SYNC_VIDEO_MASTER:
+	case AV_SYNC_VIDEO_MASTER:
 		val = m_vidClk.getClock();
 		break;
-	case Clock::AV_SYNC_AUDIO_MASTER:
+	case AV_SYNC_AUDIO_MASTER:
 		val = m_audClk.getClock();
 		break;
 	default:
@@ -603,7 +603,7 @@ int VideoState::synchronizeAudio(int nbSamples)
 	int wantedNbSamples = nbSamples;
 	const int SAMPLE_CORRECTION_PERCENT_MAX = 10;
 
-	if (masterSyncType() != Clock::AV_SYNC_AUDIO_MASTER) {
+	if (masterSyncType() != AV_SYNC_AUDIO_MASTER) {
 		double diff, avgDiff;
 		int minNbSamples, maxNbSamples;
 
@@ -767,7 +767,7 @@ void VideoState::refreshVideo(double & remainingTime)
 	double time;
 	Frame *sp, *sp2;
 
-	if (m_paused && masterSyncType() == Clock::AV_SYNC_EXTERNAL_CLOCK && m_realtime) {
+	if (m_paused && masterSyncType() == AV_SYNC_EXTERNAL_CLOCK && m_realtime) {
 		checkExternalClockSpeed();
 	}
 
@@ -833,7 +833,7 @@ retry:
 			if (m_pictureQ.remaining() > 1) {
 				Frame *nextVp = m_pictureQ.peekNext();
 				duration = vpDuration(vp, nextVp);
-				if (!m_step && (s_frameDrop > 0 || (s_frameDrop && masterSyncType() != Clock::AV_SYNC_VIDEO_MASTER)) &&
+				if (!m_step && (s_frameDrop > 0 || (s_frameDrop && masterSyncType() != AV_SYNC_VIDEO_MASTER)) &&
 					time > m_frameTimer + duration) {
 					m_frameDropsLate++;
 					m_pictureQ.next();
@@ -977,7 +977,7 @@ double VideoState::computeTargetDelay(double delay)
 	double syncThreshold, diff = 0;
 
 	const float AV_SYNC_FRAMEDUP_THRESHOLD = 0.1;
-	if (masterSyncType() != Clock::AV_SYNC_AUDIO_MASTER) {
+	if (masterSyncType() != AV_SYNC_AUDIO_MASTER) {
 		diff = m_vidClk.getClock() - getMasterClock();
 
 		syncThreshold = FFMAX(AV_SYNC_THRESHOLD_MIN, FFMIN(AV_SYNC_THRESHOLD_MAX, delay));
@@ -1020,7 +1020,7 @@ int VideoState::getVideoFrame(AVFrame * frame)
 		}
 		frame->sample_aspect_ratio = av_guess_sample_aspect_ratio(m_ic, m_videoSt, frame);
 
-		if (s_frameDrop > 0 || (s_frameDrop && masterSyncType() != Clock::AV_SYNC_VIDEO_MASTER)) {
+		if (s_frameDrop > 0 || (s_frameDrop && masterSyncType() != AV_SYNC_VIDEO_MASTER)) {
 			if (frame->pts != AV_NOPTS_VALUE) {
 				double diff = dpts - getMasterClock();
 				if (!isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD &&
