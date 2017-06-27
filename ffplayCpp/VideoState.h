@@ -19,6 +19,8 @@ class Decoder;
 struct SwsContext;
 struct SwrContext;
 
+struct Renderer;
+
 // TODO : make this into class
 struct AudioParams {
 	int freq;
@@ -151,7 +153,6 @@ private:	// members should be zero on creating
 	int m_subtitleStream = -1;	
 
 	SDL_Window *m_window = nullptr;
-	SDL_Renderer *m_renderer = nullptr;
 
 	bool m_isFullScreen = false;
 	bool m_isBorderless = true;
@@ -259,6 +260,8 @@ private:	// members should be zero on creating
 	std::unique_ptr<Decoder> m_audDec;
 	std::unique_ptr<Decoder> m_vidDec;
 	std::unique_ptr<Decoder> m_subDec;	
+
+	std::unique_ptr<Renderer> m_renderer;
 };
 
 #endif

@@ -157,6 +157,7 @@
     <ClInclude Include="FfplayCpp.h" />
     <ClInclude Include="FrameQueue.h" />
     <ClInclude Include="PacketQueue.h" />
+    <ClInclude Include="Renderer.h" />
     <ClInclude Include="VideoState.h" />
   </ItemGroup>
   <ItemGroup>
@@ -165,6 +166,7 @@
     <ClCompile Include="ffplayCpp.cpp" />
     <ClCompile Include="FrameQueue.cpp" />
     <ClCompile Include="PacketQueue.cpp" />
+    <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="VideoState.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

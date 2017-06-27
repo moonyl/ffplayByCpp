@@ -16,6 +16,8 @@ extern "C" {
 
 #include "Decoder.h"
 
+#include "Renderer.h"
+
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
 
@@ -153,17 +155,7 @@ int VideoState::openVideo()
 		m_window = SDL_CreateWindow(m_windowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenWidth, screenHeight, flags);
 		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 		if (m_window) {
-			SDL_RendererInfo info;
-			m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-			if (!m_renderer) {
-				av_log(NULL, AV_LOG_WARNING, "Failed to initialize a hardware accelerated renderer: %s\n", SDL_GetError());
-				m_renderer = SDL_CreateRenderer(m_window, -1, 0);
-			}
-			if (m_renderer) {
-				if (!SDL_GetRendererInfo(m_renderer, &info)) {
-					av_log(NULL, AV_LOG_VERBOSE, "Initialized %s renderer.\n", info.name);
-				}
-			}
+			m_renderer = std::make_unique<Renderer>(*m_window);
 		}
 	}
 	else {
@@ -187,8 +179,8 @@ void VideoState::displayVideo()
 		openVideo();
 	}
 
-	SDL_SetRenderDrawColor(m_renderer, 0, 0, 0, 255);
-	SDL_RenderClear(m_renderer);
+	m_renderer->setDrawColor(0, 0, 0, 255);
+	m_renderer->clear();
 
 	// TODO : execute display
 	if (m_audioSt && m_showMode != SHOW_MODE_VIDEO) {
@@ -196,8 +188,9 @@ void VideoState::displayVideo()
 	}
 	else if (m_videoSt) {
 		displayVideoImage();
-	}	
-	SDL_RenderPresent(m_renderer);
+	}
+
+	m_renderer->present();
 }
 
 void VideoState::stepToNextFrame()
@@ -1113,7 +1106,7 @@ void VideoState::fillRectangle(int x, int y, int w, int h)
 	rect.w = w;
 	rect.h = h;
 	if (w && h) {
-		SDL_RenderFillRect(m_renderer, &rect);
+		m_renderer->fillRectangle(rect);
 	}
 }
 
@@ -1131,7 +1124,7 @@ int VideoState::reallocTexture(SDL_Texture ** texture, Uint32 newFormat, int new
 		void *pixels;
 		int pitch;
 		SDL_DestroyTexture(*texture);
-		if (!(*texture = SDL_CreateTexture(m_renderer, newFormat, SDL_TEXTUREACCESS_STREAMING, newWidth, newHeight))) {
+		if (!(*texture = SDL_CreateTexture(m_renderer->renderer(), newFormat, SDL_TEXTUREACCESS_STREAMING, newWidth, newHeight))) {
 			return -1;
 		}
 		if (SDL_SetTextureBlendMode(*texture, blendMode) < 0) {
@@ -1258,7 +1251,8 @@ void VideoState::displayVideoImage()
 		vp->setFlipV(vp->frameLineSize0() < 0);
 	}
 
-	SDL_RenderCopyEx(m_renderer, m_vidTexture, nullptr, &rect, 0, nullptr, (vp->flipV() ? SDL_FLIP_VERTICAL : SDL_FLIP_NONE));
+	m_renderer->copyEx(*m_vidTexture, rect, 0, (vp->flipV() ? SDL_FLIP_VERTICAL : SDL_FLIP_NONE));
+
 	if (sp) {
 #if USE_ONEPASS_SUBTITLE_RENDER
 		SDL_RenderCopy(m_renderer, m_subTexture, nullptr, &rect);
@@ -1270,7 +1264,7 @@ void VideoState::displayVideoImage()
 			SDL_Rect *subRect = (SDL_Rect*)sp->sub().rects[i];
 			SDL_Rect target = { rect.x + subRect->x * xRatio,
 				rect.y + subRect->y * yRatio, subRect->w * xRatio, subRect->h * yRatio };
-			SDL_RenderCopy(m_renderer, m_subTexture, subRect, &target);
+			m_renderer->copy(*m_subTexture, *subRect, target);
 		}
 #endif
 	}
@@ -1328,7 +1322,7 @@ void VideoState::displayVideoAudio()
 	}
 
 	if (m_showMode == SHOW_MODE_WAVES) {
-		SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
+		m_renderer->setDrawColor(255, 255, 255, 255);
 
 		h = m_height / nbDisplayChannels;
 		h2 = (h * 9) / 20;
@@ -1352,7 +1346,7 @@ void VideoState::displayVideoAudio()
 			}
 		}
 
-		SDL_SetRenderDrawColor(m_renderer, 0, 0, 255, 255);
+		m_renderer->setDrawColor(0, 0, 255, 255);
 
 		for (ch = 1; ch < nbDisplayChannels; ch++) {
 			y = m_yTop + ch * h;
@@ -1408,7 +1402,7 @@ void VideoState::displayVideoAudio()
 				}
 				SDL_UnlockTexture(m_visTexture);
 			}
-			SDL_RenderCopy(m_renderer, m_visTexture, nullptr, nullptr);
+			m_renderer->copy(*m_visTexture);
 		}
 		if (!m_paused) {
 			m_xPos++;
