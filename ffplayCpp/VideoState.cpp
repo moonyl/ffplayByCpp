@@ -17,6 +17,7 @@ extern "C" {
 #include "Decoder.h"
 
 #include "Renderer.h"
+#include "Window.h"
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
@@ -137,29 +138,20 @@ int VideoState::openVideo()
 	int screenWidth = defaultWidth;
 	int screenHeight = defaultHeight;
 
-	if (!m_window) {
-		int flags = SDL_WINDOW_SHOWN;
-		if (!m_windowTitle) {
-			m_windowTitle = m_filename;
-		}
-		if (m_isFullScreen) {
-			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-		}
-		if (m_isBorderless) {
-			flags |= SDL_WINDOW_BORDERLESS;
-		}
-		else {
-			flags |= SDL_WINDOW_RESIZABLE;
-		}
+	if (!m_windowTitle) {
+		m_windowTitle = m_filename;
+	}
 
-		m_window = SDL_CreateWindow(m_windowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenWidth, screenHeight, flags);
-		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	if (!m_window) {
+		m_window = std::make_unique<Window>(
+			Window::WindowConfig{ m_windowTitle, m_isFullScreen, m_isBorderless, screenWidth, screenHeight });
+
 		if (m_window) {
 			m_renderer = std::make_unique<Renderer>(*m_window);
 		}
 	}
 	else {
-		SDL_SetWindowSize(m_window, screenWidth, screenHeight);
+		m_window->setSize(screenWidth, screenHeight);
 	}
 
 	if (!m_window || !m_renderer) {

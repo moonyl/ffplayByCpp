@@ -1,17 +1,18 @@
 #include "Renderer.h"
 #include <SDL.h>
+#include "Window.h"
 extern "C"
 {
 #include <libavutil/avutil.h>
 }
 
 
-Renderer::Renderer(SDL_Window & window) :
-	m_renderer(SDL_CreateRenderer(&window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC))
+Renderer::Renderer(Window & window) :
+	m_renderer(SDL_CreateRenderer(window.handle(), -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC))
 {
 	if (!m_renderer) {
 		av_log(NULL, AV_LOG_WARNING, "Failed to initialize a hardware accelerated renderer: %s\n", SDL_GetError());
-		m_renderer.reset(SDL_CreateRenderer(&window, -1, 0));
+		m_renderer.reset(SDL_CreateRenderer(window.handle(), -1, 0));
 	}
 	if (m_renderer) {
 		SDL_RendererInfo info;

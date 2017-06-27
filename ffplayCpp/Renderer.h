@@ -3,10 +3,12 @@
 #include <memory>
 #include <SDL.h>
 
+class Window;
+
 class Renderer
 {
 public:
-	Renderer(SDL_Window &window);
+	Renderer(Window &window);
 	~Renderer();
 
 public:
