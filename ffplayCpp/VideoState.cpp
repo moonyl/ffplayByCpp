@@ -462,6 +462,17 @@ int VideoState::openStreamComponent(int streamIndex)
 		if ((ret = m_vidDec->start(videoThread, this)) < 0) {
 			// TODO : throw exception
 		}
+		break;
+	case AVMEDIA_TYPE_SUBTITLE:
+		m_subtitleStream = streamIndex;
+		m_subtitleSt = ic->streams[streamIndex];
+		m_subDec.reset(new Decoder(avctx, m_subtitleQ, *m_continueReadThread));
+		if ((ret = m_subDec->start(subTitleThread, this)) < 0) {
+			// TODO : throw exception
+		}
+		break;
+	default:
+		break;
 	}
 	goto out;
 
@@ -838,12 +849,12 @@ retry:
 					}
 
 					if (sp->serial() != m_subtitleQ.serial() ||
-						(m_vidClk.pts() > (sp->pts() + ((float)sp->sub().end_display_time / 1000))) ||
-						(sp2 && m_vidClk.pts() > (sp2->pts() + ((float)sp2->sub().start_display_time / 1000)))) {
+						(m_vidClk.pts() > (sp->pts() + ((float)sp->sub()->end_display_time / 1000))) ||
+						(sp2 && m_vidClk.pts() > (sp2->pts() + ((float)sp2->sub()->start_display_time / 1000)))) {
 						if (sp->uploaded()) {
 							int i;
-							for (i = 0; i < sp->sub().num_rects; i++) {
-								AVSubtitleRect *subRect = sp->sub().rects[i];
+							for (i = 0; i < sp->sub()->num_rects; i++) {
+								AVSubtitleRect *subRect = sp->sub()->rects[i];
 								uint8_t *pixels;
 								int pitch, j;
 
@@ -1184,7 +1195,7 @@ void VideoState::displayVideoImage()
 		if (m_subPictureQ.remaining() > 0) {
 			sp = m_subPictureQ.peek();
 
-			if (vp->pts() >= sp->pts() + ((float)sp->sub().start_display_time / 1000)) {
+			if (vp->pts() >= sp->pts() + ((float)sp->sub()->start_display_time / 1000)) {
 				if (!sp->uploaded()) {
 					uint8_t *pixels[4];
 					int pitch[4];
@@ -1198,8 +1209,8 @@ void VideoState::displayVideoImage()
 						return;
 					}
 
-					for (i = 0; i < sp->sub().num_rects; i++) {
-						AVSubtitleRect *subRect = sp->sub().rects[i];
+					for (i = 0; i < sp->sub()->num_rects; i++) {
+						AVSubtitleRect *subRect = sp->sub()->rects[i];
 
 						subRect->x = av_clip(subRect->x, 0, sp->width());
 						subRect->y = av_clip(subRect->y, 0, sp->height());
@@ -1252,8 +1263,8 @@ void VideoState::displayVideoImage()
 		int i;
 		double xRatio = (double)rect.w / (double)sp->width();
 		double yRatio = (double)rect.h / (double)sp->height();
-		for (i = 0; i < sp->sub().num_rects; i++) {
-			SDL_Rect *subRect = (SDL_Rect*)sp->sub().rects[i];
+		for (i = 0; i < sp->sub()->num_rects; i++) {
+			SDL_Rect *subRect = (SDL_Rect*)sp->sub()->rects[i];
 			SDL_Rect target = { rect.x + subRect->x * xRatio,
 				rect.y + subRect->y * yRatio, subRect->w * xRatio, subRect->h * yRatio };
 			m_renderer->copy(*m_subTexture, *subRect, target);
@@ -2014,5 +2025,40 @@ the_end:
 	avfilter_graph_free(&graph);
 #endif
 	av_frame_free(&frame);
+	return 0;
+}
+
+int VideoState::subTitleThread(void * arg)
+{
+	VideoState *is = static_cast<VideoState*>(arg);
+	Frame *sp;
+	int gotSubtitle;
+	double pts;
+
+	for (;;) {
+		if (!(sp = is->m_subPictureQ.peekWritable())) {
+			return 0;
+		}
+		if ((gotSubtitle = is->m_subDec->decodeFrame(nullptr, sp->sub())) < 0) {
+			break;
+		}
+
+		pts = 0;
+
+		if (gotSubtitle && sp->subFormat() == 0) {
+			if (sp->subPts() != AV_NOPTS_VALUE) {
+				pts = sp->subPts() / (double)AV_TIME_BASE;
+			}
+			sp->setPts(pts);
+			sp->setSerial(is->m_subDec->pktSerial());
+			sp->setAreaInfo(is->m_subDec->avctx()->width,
+				is->m_subDec->avctx()->height);
+			sp->setUploaded(0);
+			is->m_subPictureQ.push();
+		}
+		else if (gotSubtitle) {
+			avsubtitle_free(sp->sub());
+		}
+	}
 	return 0;
 }

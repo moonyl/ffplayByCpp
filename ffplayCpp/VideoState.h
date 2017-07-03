@@ -112,6 +112,7 @@ private:
 	static void sdlAudioCallback(void *opaque, Uint8 *stream, int len);
 	static int audioThread(void *arg);
 	static int videoThread(void *arg);
+	static int subTitleThread(void *arg);
 
 private:	// members should be zero on creating
 	const char* m_filename = nullptr;

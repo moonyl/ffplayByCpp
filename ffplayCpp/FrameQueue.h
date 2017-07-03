@@ -31,7 +31,7 @@ public:
 	int frameWidth() const { return m_frame->width; }
 	int frameHeight() const { return m_frame->height; }
 	int64_t channelLayout() const { return m_frame->channel_layout; }
-	const AVSubtitle& sub() const { return m_sub; }
+	AVSubtitle* sub() { return &m_sub; }
 	int uploaded() const { return m_uploaded; }
 	void setWidth(int width) { m_width = width; }
 	int width() const { return m_width; }
@@ -67,6 +67,22 @@ public:
 	AVFrame *frame() const { return m_frame; }
 	void setFlipV(int flipV) { m_flipV = flipV; }
 	int flipV() const { return m_flipV; }
+	uint16_t subFormat() const {
+		return m_sub.format;
+	}
+	int64_t subPts() const {
+		return m_sub.pts;
+	}
+	void setSerial(int serial) {
+		m_serial = serial;
+	}
+	void setAreaInfo(int width, int height) {
+		m_width = width;
+		m_height = height;
+	}
+	void setPts(double pts) {
+		m_pts = pts;
+	}
 
 private:
 	AVFrame *m_frame = nullptr;
