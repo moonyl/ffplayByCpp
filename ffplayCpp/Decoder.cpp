@@ -1,6 +1,7 @@
 #include "Decoder.h"
 #include <SDL.h>
 #include "PacketQueue.h"
+#include "Thread.h"
 
 Decoder::Decoder(AVCodecContext* avctx, PacketQueue &queue, SDL_cond &emptyQueueCond) :
 	m_avctx(avctx),
@@ -18,8 +19,8 @@ Decoder::~Decoder()
 int Decoder::start(int (*func)(void*), void * arg)
 {
 	m_queue.start();
-	m_decoderTid = SDL_CreateThread(func, "decoder", arg);
-	if (!m_decoderTid) {
+	m_decoderThread = std::make_unique<Thread>(func, "decoder", arg);
+	if (!m_decoderThread) {
 		av_log(nullptr, AV_LOG_ERROR, "SDL_CreateThread(): %s\n", SDL_GetError());
 		return AVERROR(ENOMEM);
 	}

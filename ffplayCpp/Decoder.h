@@ -5,9 +5,11 @@ extern "C" {
 }
 
 #include <functional>
+#include <memory>
 struct SDL_cond;
 struct SDL_Thread;
 class PacketQueue;
+class Thread;
 
 class Decoder
 {
@@ -37,6 +39,7 @@ private:
 	AVRational m_startPtsTb = { 0, 0 };
 	int64_t m_nextPts = 0;
 	AVRational m_nextPtsTb = { 0, 0 };
-	SDL_Thread *m_decoderTid = nullptr;
+	std::unique_ptr<Thread> m_decoderThread;
+	//SDL_Thread *m_decoderTid = nullptr;
 };
 

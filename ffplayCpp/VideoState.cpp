@@ -18,6 +18,7 @@ extern "C" {
 
 #include "Renderer.h"
 #include "Window.h"
+#include "Thread.h"
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
@@ -76,14 +77,14 @@ VideoState::VideoState(const char * filename, AVInputFormat * iformat) :
 	m_audClk(m_audioQ.serial()),
 	m_vidClk(m_videoQ.serial()),
 	m_extClk(m_subtitleQ.serial()),
-	m_readTid(SDL_CreateThread(readThread, "readThread", this))
+	m_readThread(std::make_unique<Thread>(readThread, "readThread", this))	
 {
 	if (!m_continueReadThread) {
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
 		// TODO : throw exception;
 	}
 
-	if (!m_readTid) {
+	if (!m_readThread)	{
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateThread(): %s\n", SDL_GetError());
 		// TODO : throw exception;
 	}

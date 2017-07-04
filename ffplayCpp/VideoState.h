@@ -21,6 +21,7 @@ struct SwrContext;
 
 class Renderer;
 class Window;
+class Thread;
 
 // TODO : make this into class
 struct AudioParams {
@@ -144,7 +145,8 @@ private:	// members should be zero on creating
 	
 	int m_avSyncType = AV_SYNC_AUDIO_MASTER;
 
-	SDL_Thread *m_readTid = nullptr;
+	//SDL_Thread *m_readTid = nullptr;
+	std::unique_ptr<Thread> m_readThread;
 
 	AVStream *m_audioSt = nullptr;
 	AVStream *m_videoSt = nullptr;
