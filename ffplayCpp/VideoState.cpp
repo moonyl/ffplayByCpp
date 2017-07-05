@@ -19,6 +19,7 @@ extern "C" {
 #include "Renderer.h"
 #include "Window.h"
 #include "Thread.h"
+#include "Condition.h"
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
@@ -69,17 +70,17 @@ const float VideoState::AV_NOSYNC_THRESHOLD = 10.0;
 
 VideoState::VideoState(const char * filename, AVInputFormat * iformat) :
 	m_filename(av_strdup(filename)),
-	m_iFormat(iformat),	
+	m_iFormat(iformat),
 	m_pictureQ(m_videoQ, FrameQueue::VIDEO_PICTURE_QUEUE_SIZE, 1),
 	m_subPictureQ(m_subtitleQ, FrameQueue::SUBPICTURE_QUEUE_SIZE, 0),
 	m_sampleQ(m_audioQ, FrameQueue::SAMPLE_QUEUE_SIZE, 1),
-	m_continueReadThread(SDL_CreateCond()),
+	m_condReadThread(std::make_unique<Condition>()),
 	m_audClk(m_audioQ.serial()),
 	m_vidClk(m_videoQ.serial()),
 	m_extClk(m_subtitleQ.serial()),
 	m_readThread(std::make_unique<Thread>(readThread, "readThread", this))	
 {
-	if (!m_continueReadThread) {
+	if (!m_condReadThread) {
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
 		// TODO : throw exception;
 	}
@@ -444,7 +445,7 @@ int VideoState::openStreamComponent(int streamIndex)
 		m_audioStream = streamIndex;
 		m_audioSt = ic->streams[streamIndex];
 
-		m_audDec.reset(new Decoder(avctx, m_audioQ, *m_continueReadThread));
+		m_audDec.reset(new Decoder(avctx, m_audioQ, *m_condReadThread.get()));
 		if ((m_ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK))
 			&& !m_ic->iformat->read_seek) {
 			m_audDec->setStartPts(m_audioSt->start_time);
@@ -459,7 +460,7 @@ int VideoState::openStreamComponent(int streamIndex)
 		m_videoStream = streamIndex;
 		m_videoSt = ic->streams[streamIndex];
 
-		m_vidDec.reset(new Decoder(avctx, m_videoQ, *m_continueReadThread));
+		m_vidDec.reset(new Decoder(avctx, m_videoQ, *m_condReadThread.get()));
 		if ((ret = m_vidDec->start(videoThread, this)) < 0) {
 			// TODO : throw exception
 		}
@@ -467,7 +468,7 @@ int VideoState::openStreamComponent(int streamIndex)
 	case AVMEDIA_TYPE_SUBTITLE:
 		m_subtitleStream = streamIndex;
 		m_subtitleSt = ic->streams[streamIndex];
-		m_subDec.reset(new Decoder(avctx, m_subtitleQ, *m_continueReadThread));
+		m_subDec.reset(new Decoder(avctx, m_subtitleQ, *m_condReadThread.get()));
 		if ((ret = m_subDec->start(subTitleThread, this)) < 0) {
 			// TODO : throw exception
 		}
@@ -755,7 +756,7 @@ void VideoState::seekStream(int64_t pos, int64_t rel, int seekByBytes)
 			m_seekFlags |= AVSEEK_FLAG_BYTE;
 		}
 		m_seekReq = 1;
-		SDL_CondSignal(m_continueReadThread);
+		m_condReadThread->signal();
 	}
 }
 
@@ -1734,7 +1735,7 @@ int VideoState::readThread(void * arg)
 				is->m_videoQ.hasEnoughPackets(is->m_videoSt, is->m_videoStream) &&
 				is->m_subtitleQ.hasEnoughPackets(is->m_subtitleSt, is->m_subtitleStream)))) {
 			SDL_LockMutex(waitMutex);
-			SDL_CondWaitTimeout(is->m_continueReadThread, waitMutex, 10);
+			is->m_condReadThread->waitTimeout(*waitMutex, 10);
 			SDL_UnlockMutex(waitMutex);
 			continue;
 		}
@@ -1768,7 +1769,7 @@ int VideoState::readThread(void * arg)
 				break;
 			}
 			SDL_LockMutex(waitMutex);
-			SDL_CondWaitTimeout(is->m_continueReadThread, waitMutex, 10);
+			is->m_condReadThread->waitTimeout(*waitMutex, 10);
 			SDL_UnlockMutex(waitMutex);
 		}
 		else {

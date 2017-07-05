@@ -2,8 +2,9 @@
 #include <SDL.h>
 #include "PacketQueue.h"
 #include "Thread.h"
+#include "Condition.h"
 
-Decoder::Decoder(AVCodecContext* avctx, PacketQueue &queue, SDL_cond &emptyQueueCond) :
+Decoder::Decoder(AVCodecContext* avctx, PacketQueue &queue, Condition &emptyQueueCond) :
 	m_avctx(avctx),
 	m_queue(queue),
 	m_emptyQueueCond(emptyQueueCond)
@@ -96,7 +97,7 @@ int Decoder::decodeFrame(AVFrame * frame, AVSubtitle * sub)
 
 		do {
 			if (m_queue.nbPackets() == 0) {
-				SDL_CondSignal(&m_emptyQueueCond);
+				m_emptyQueueCond.signal();
 			}
 			if (m_packetPending) {
 				av_packet_move_ref(&pkt, &m_pkt);

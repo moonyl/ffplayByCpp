@@ -2,12 +2,13 @@
 extern "C" {
 #include <libavutil/avutil.h>
 }
+#include "Condition.h"
 
 AVPacket PacketQueue::s_flushPkt;
 
 PacketQueue::PacketQueue() :
 	m_mutex(SDL_CreateMutex()),
-	m_cond(SDL_CreateCond())
+	m_cond(std::make_unique<Condition>())
 {
 	// TODO : thread-safe
 	if (s_flushPkt.data == nullptr) {
@@ -66,7 +67,7 @@ int PacketQueue::putPrivate(AVPacket * pkt)
 	m_size += pktList->pkt.size + sizeof(*pktList);
 	m_duration += pktList->pkt.duration;
 
-	SDL_CondSignal(m_cond);
+	m_cond->signal();
 	return 0;
 }
 
@@ -118,7 +119,7 @@ int PacketQueue::get(AVPacket * pkt, int block, int * serial)
 			break;
 		}
 		else {
-			SDL_CondWait(m_cond, m_mutex);
+			m_cond->wait(*m_mutex);
 		}
 	}
 	SDL_UnlockMutex(m_mutex);

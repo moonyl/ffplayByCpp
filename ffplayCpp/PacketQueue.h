@@ -4,6 +4,8 @@ extern "C"	{
 #include <libavformat/avformat.h>
 }
 #include <SDL.h>
+#include <memory>
+class Condition;
 
 struct MyAVPacketList
 {
@@ -42,7 +44,7 @@ private:
 	int m_abortRequest = 0;
 	int m_serial = 0;
 	SDL_mutex *m_mutex = nullptr;
-	SDL_cond *m_cond = nullptr;
+	std::unique_ptr<Condition> m_cond;
 	static AVPacket s_flushPkt;
 };
 

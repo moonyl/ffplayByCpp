@@ -22,6 +22,7 @@ struct SwrContext;
 class Renderer;
 class Window;
 class Thread;
+class Condition;
 
 // TODO : make this into class
 struct AudioParams {
@@ -134,7 +135,7 @@ private:	// members should be zero on creating
 	FrameQueue m_subPictureQ;
 	FrameQueue m_sampleQ;
 
-	SDL_cond *m_continueReadThread = nullptr;
+	std::unique_ptr<Condition> m_condReadThread;
 
 	Clock m_audClk;
 	Clock m_vidClk;
@@ -145,7 +146,6 @@ private:	// members should be zero on creating
 	
 	int m_avSyncType = AV_SYNC_AUDIO_MASTER;
 
-	//SDL_Thread *m_readTid = nullptr;
 	std::unique_ptr<Thread> m_readThread;
 
 	AVStream *m_audioSt = nullptr;

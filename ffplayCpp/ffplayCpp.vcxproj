@@ -153,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Clock.h" />
+    <ClInclude Include="Condition.h" />
     <ClInclude Include="Decoder.h" />
     <ClInclude Include="FfplayCpp.h" />
     <ClInclude Include="FrameQueue.h" />
@@ -164,6 +165,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Clock.cpp" />
+    <ClCompile Include="Condition.cpp" />
     <ClCompile Include="Decoder.cpp" />
     <ClCompile Include="ffplayCpp.cpp" />
     <ClCompile Include="FrameQueue.cpp" />

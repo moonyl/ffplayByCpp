@@ -6,15 +6,14 @@ extern "C" {
 
 #include <functional>
 #include <memory>
-struct SDL_cond;
-struct SDL_Thread;
 class PacketQueue;
 class Thread;
+class Condition;
 
 class Decoder
 {
 public:
-	Decoder(AVCodecContext* avctx, PacketQueue &queue, SDL_cond &emptyQueueCond);
+	Decoder(AVCodecContext* avctx, PacketQueue &queue, Condition &emptyQueueCond);
 	~Decoder();
 
 public:
@@ -34,12 +33,11 @@ private:
 	int m_pktSerial = -1;
 	int m_finished = 0;
 	int m_packetPending = 0;
-	SDL_cond &m_emptyQueueCond;
+	Condition &m_emptyQueueCond;
 	int64_t m_startPts = AV_NOPTS_VALUE;
 	AVRational m_startPtsTb = { 0, 0 };
 	int64_t m_nextPts = 0;
 	AVRational m_nextPtsTb = { 0, 0 };
 	std::unique_ptr<Thread> m_decoderThread;
-	//SDL_Thread *m_decoderTid = nullptr;
 };
 

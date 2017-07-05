@@ -3,10 +3,10 @@
 extern "C" {
 #include <libavformat/avformat.h>
 }
-
+#include <memory>
 struct SDL_mutex;
-struct SDL_cond;
 class PacketQueue;
+class Condition;
 
 class Frame
 {
@@ -136,7 +136,7 @@ private:
 	int m_keepLast = 0;
 	int m_rIndexShown = 0;
 	SDL_mutex *m_mutex = nullptr;
-	SDL_cond *m_cond = nullptr;
+	std::unique_ptr<Condition> m_cond;
 	PacketQueue &m_pktQ;
 };
 
