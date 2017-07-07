@@ -159,6 +159,7 @@
     <ClInclude Include="FrameQueue.h" />
     <ClInclude Include="PacketQueue.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="SwScaleContext.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="VideoState.h" />
     <ClInclude Include="Window.h" />
@@ -171,6 +172,7 @@
     <ClCompile Include="FrameQueue.cpp" />
     <ClCompile Include="PacketQueue.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="SwScaleContext.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="VideoState.cpp" />
     <ClCompile Include="Window.cpp" />

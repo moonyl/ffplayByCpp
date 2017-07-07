@@ -20,6 +20,7 @@ extern "C" {
 #include "Window.h"
 #include "Thread.h"
 #include "Condition.h"
+#include "SwScaleContext.h"
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
@@ -78,6 +79,8 @@ VideoState::VideoState(const char * filename, AVInputFormat * iformat) :
 	m_audClk(m_audioQ.serial()),
 	m_vidClk(m_videoQ.serial()),
 	m_extClk(m_subtitleQ.serial()),
+	m_imgConvertCtx(std::make_unique<SwScaleContext>()),
+	m_subConvertCtx(std::make_unique<SwScaleContext>()),
 	m_readThread(std::make_unique<Thread>(readThread, "readThread", this))	
 {
 	if (!m_condReadThread) {
@@ -1146,9 +1149,10 @@ int VideoState::reallocTexture(SDL_Texture ** texture, Uint32 newFormat, int new
 	return 0;
 }
 
-
-static int uploadTexture(SDL_Texture *tex, AVFrame *frame, SwsContext **imgConvertCtx) {
+int VideoState::uploadTexture(SDL_Texture *tex, AVFrame *frame) 
+{
 	int ret = 0;
+	
 	switch (frame->format) {
 	case AV_PIX_FMT_YUV420P:
 		if (frame->linesize[0] < 0 || frame->linesize[1] < 0 || frame->linesize[2] < 0) {
@@ -1167,13 +1171,13 @@ static int uploadTexture(SDL_Texture *tex, AVFrame *frame, SwsContext **imgConve
 		}
 		break;
 	default:
-		*imgConvertCtx = sws_getCachedContext(*imgConvertCtx, frame->width, frame->height, static_cast<AVPixelFormat>(frame->format), frame->width, frame->height,
-			AV_PIX_FMT_BGRA, s_swsFlags, nullptr, nullptr, nullptr);
-		if (*imgConvertCtx != nullptr) {
+		bool retVal = m_imgConvertCtx->applyCachedContext(frame->width, frame->height, static_cast<AVPixelFormat>(frame->format), frame->width, frame->height,
+			AV_PIX_FMT_BGRA, s_swsFlags);
+		if (retVal) {
 			uint8_t *pixels[4];
 			int pitch[4];
 			if (!SDL_LockTexture(tex, nullptr, (void**)pixels, pitch)) {
-				sws_scale(*imgConvertCtx, (const uint8_t * const *)frame->data, frame->linesize, 0, frame->height, pixels, pitch);
+				m_imgConvertCtx->scale((const uint8_t * const *)frame->data, frame->linesize, 0, frame->height, pixels, pitch);
 				SDL_UnlockTexture(tex);
 			}
 		}
@@ -1219,16 +1223,18 @@ void VideoState::displayVideoImage()
 						subRect->w = av_clip(subRect->w, 0, sp->width() - subRect->x);
 						subRect->h = av_clip(subRect->h, 0, sp->height() - subRect->y);
 
-						m_subConvertCtx = sws_getCachedContext(m_subConvertCtx,
+						bool retVal = m_subConvertCtx->applyCachedContext(
 							subRect->w, subRect->h, AV_PIX_FMT_PAL8,
 							subRect->w, subRect->h, AV_PIX_FMT_BGRA,
 							0, nullptr, nullptr, nullptr);
-						if (!m_subConvertCtx) {
+
+						if (!retVal) {
 							av_log(nullptr, AV_LOG_FATAL, "Cannot initialize the conversion context\n");
 							return;
 						}
+
 						if (!SDL_LockTexture(m_subTexture, (SDL_Rect *)subRect, (void**)pixels, pitch)) {
-							sws_scale(m_subConvertCtx, (const uint8_t * const *)subRect->data, subRect->linesize,
+							m_subConvertCtx->scale((const uint8_t * const *)subRect->data, subRect->linesize,
 								0, subRect->h, pixels, pitch);
 							SDL_UnlockTexture(m_subTexture);
 						}
@@ -1245,11 +1251,12 @@ void VideoState::displayVideoImage()
 	calculateDisplayRect(&rect, m_xLeft, m_yTop, m_width, m_height, vp->width(), vp->height(), vp->sar());
 
 	if (!vp->uploaded()) {
-		int sdlPixFmt = vp->frameFormat() == AV_PIX_FMT_YUV420P ? SDL_PIXELFORMAT_YV12 : SDL_PIXELFORMAT_ABGR8888;
+		//int sdlPixFmt = vp->frameFormat() == AV_PIX_FMT_YUV420P ? SDL_PIXELFORMAT_YV12 : SDL_PIXELFORMAT_ABGR8888;
+		int sdlPixFmt = SDL_PIXELFORMAT_ABGR8888;
 		if (reallocTexture(&m_vidTexture, sdlPixFmt, vp->frameWidth(), vp->frameHeight(), SDL_BLENDMODE_NONE, 0) < 0) {
 			return;
 		}
-		if (uploadTexture(m_vidTexture, vp->frame(), &m_imgConvertCtx) < 0) {
+		if (uploadTexture(m_vidTexture, vp->frame()) < 0) {
 			return;
 		}
 		vp->setUploaded(1);

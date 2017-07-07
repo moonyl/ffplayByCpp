@@ -23,6 +23,7 @@ class Renderer;
 class Window;
 class Thread;
 class Condition;
+class SwScaleContext;
 
 // TODO : make this into class
 struct AudioParams {
@@ -107,6 +108,7 @@ private:
 	int computeMod(int a, int b);
 	int reallocTexture(SDL_Texture **texture, Uint32 newFormat, int newWidth, int newHeight, SDL_BlendMode blendMode, int initTexture);
 	void displayVideoImage();
+	int uploadTexture(SDL_Texture *tex, AVFrame *frame);
 
 private:
 	static int readThread(void *arg);
@@ -115,7 +117,7 @@ private:
 	static int audioThread(void *arg);
 	static int videoThread(void *arg);
 	static int subTitleThread(void *arg);
-
+	
 private:	// members should be zero on creating
 	const char* m_filename = nullptr;
 	const char* m_windowTitle = nullptr;
@@ -250,8 +252,8 @@ private:	// members should be zero on creating
 
 	int m_xPos = 0;
 
-	SwsContext *m_subConvertCtx = nullptr;
-	SwsContext *m_imgConvertCtx = nullptr;
+	std::unique_ptr<SwScaleContext> m_subConvertCtx;
+	std::unique_ptr<SwScaleContext> m_imgConvertCtx;
 
 	SwrContext *m_swrCtx = nullptr;
 	double m_audioDiffCum;
