@@ -109,6 +109,11 @@ private:
 	int reallocTexture(SDL_Texture **texture, Uint32 newFormat, int newWidth, int newHeight, SDL_BlendMode blendMode, int initTexture);
 	void displayVideoImage();
 	int uploadTexture(SDL_Texture *tex, AVFrame *frame);
+	int runReadStream();
+	void handleAudioCallback(Uint8 *stream, int len);
+	int runAudioDecoding();
+	int runVideoDecoding();
+	int runSubtitleDecoding();
 
 private:
 	static int readThread(void *arg);
