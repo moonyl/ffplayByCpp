@@ -1251,8 +1251,7 @@ void VideoState::displayVideoImage()
 	calculateDisplayRect(&rect, m_xLeft, m_yTop, m_width, m_height, vp->width(), vp->height(), vp->sar());
 
 	if (!vp->uploaded()) {
-		//int sdlPixFmt = vp->frameFormat() == AV_PIX_FMT_YUV420P ? SDL_PIXELFORMAT_YV12 : SDL_PIXELFORMAT_ABGR8888;
-		int sdlPixFmt = SDL_PIXELFORMAT_ABGR8888;
+		int sdlPixFmt = vp->frameFormat() == AV_PIX_FMT_YUV420P ? SDL_PIXELFORMAT_YV12 : SDL_PIXELFORMAT_ABGR8888;		
 		if (reallocTexture(&m_vidTexture, sdlPixFmt, vp->frameWidth(), vp->frameHeight(), SDL_BLENDMODE_NONE, 0) < 0) {
 			return;
 		}
