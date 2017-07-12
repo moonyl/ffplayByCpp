@@ -3,11 +3,12 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 #include "Condition.h"
+#include "Mutex.h"
 
 AVPacket PacketQueue::s_flushPkt;
 
 PacketQueue::PacketQueue() :
-	m_mutex(SDL_CreateMutex()),
+	m_mutex(std::make_unique<Mutex>()),
 	m_cond(std::make_unique<Condition>())
 {
 	// TODO : thread-safe
@@ -78,10 +79,10 @@ bool PacketQueue::isAbortRequested()
 
 void PacketQueue::start()
 {
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	m_abortRequest = 0;
 	putPrivate(&s_flushPkt);
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 }
 
 int PacketQueue::get(AVPacket * pkt, int block, int * serial)
@@ -89,7 +90,7 @@ int PacketQueue::get(AVPacket * pkt, int block, int * serial)
 	MyAVPacketList *pkt1;
 	int ret;
 
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 
 	for (;;) {
 		if (m_abortRequest) {
@@ -122,7 +123,7 @@ int PacketQueue::get(AVPacket * pkt, int block, int * serial)
 			m_cond->wait(*m_mutex);
 		}
 	}
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 	return ret;
 }
 
@@ -130,7 +131,7 @@ void PacketQueue::flush()
 {
 	MyAVPacketList *pkt, *pkt1;
 
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	for (pkt = m_firstPkt; pkt; pkt = pkt1) {
 		pkt1 = pkt->next;
 		av_packet_unref(&pkt->pkt);
@@ -141,16 +142,17 @@ void PacketQueue::flush()
 	m_nbPackets = 0;
 	m_size = 0;
 	m_duration = 0;
-	SDL_UnlockMutex(m_mutex);
+
+	m_mutex->unlock();
 }
 
 int PacketQueue::put(AVPacket * pkt)
 {
 	int ret;
 
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	ret = putPrivate(pkt);
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 
 	if (pkt != &flushPkt && ret < 0) {
 		av_packet_unref(pkt);

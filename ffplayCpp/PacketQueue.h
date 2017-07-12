@@ -5,7 +5,9 @@ extern "C"	{
 }
 #include <SDL.h>
 #include <memory>
+
 class Condition;
+class Mutex;
 
 struct MyAVPacketList
 {
@@ -43,7 +45,7 @@ private:
 	int64_t m_duration = 0;
 	int m_abortRequest = 0;
 	int m_serial = 0;
-	SDL_mutex *m_mutex = nullptr;
+	std::unique_ptr<Mutex> m_mutex;
 	std::unique_ptr<Condition> m_cond;
 	static AVPacket s_flushPkt;
 };

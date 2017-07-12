@@ -1,11 +1,10 @@
 #include "Condition.h"
-
+#include "Mutex.h"
 
 
 Condition::Condition() :
 	m_condition(SDL_CreateCond())
 {
-	int a = 0;
 }
 
 
@@ -18,12 +17,12 @@ int Condition::signal()
 	return SDL_CondSignal(m_condition.get());
 }
 
-int Condition::wait(SDL_mutex & mutex)
+int Condition::wait(Mutex & mutex)
 {
-	return SDL_CondWait(m_condition.get(), &mutex);
+	return SDL_CondWait(m_condition.get(), mutex.sdlMutex());
 }
 
-int Condition::waitTimeout(SDL_mutex & mutex, Uint32 milisec)
+int Condition::waitTimeout(Mutex & mutex, Uint32 milisec)
 {
-	return SDL_CondWaitTimeout(m_condition.get(), &mutex, milisec);
+	return SDL_CondWaitTimeout(m_condition.get(), mutex.sdlMutex(), milisec);
 }

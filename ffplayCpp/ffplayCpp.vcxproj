@@ -157,6 +157,7 @@
     <ClInclude Include="Decoder.h" />
     <ClInclude Include="FfplayCpp.h" />
     <ClInclude Include="FrameQueue.h" />
+    <ClInclude Include="Mutex.h" />
     <ClInclude Include="PacketQueue.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="SwScaleContext.h" />
@@ -170,6 +171,7 @@
     <ClCompile Include="Decoder.cpp" />
     <ClCompile Include="ffplayCpp.cpp" />
     <ClCompile Include="FrameQueue.cpp" />
+    <ClCompile Include="Mutex.cpp" />
     <ClCompile Include="PacketQueue.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="SwScaleContext.cpp" />

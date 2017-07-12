@@ -4,7 +4,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 #include <memory>
-struct SDL_mutex;
+class Mutex;
 class PacketQueue;
 class Condition;
 
@@ -117,7 +117,9 @@ public:
 	int remaining() const;
 	int64_t lastPos() const;
 	int rIndexShown() const;
-	SDL_mutex *mutex() const;
+	
+	void lock();
+	void unlock();
 
 public:
 	enum {
@@ -135,7 +137,7 @@ private:
 	int m_maxSize = 0;
 	int m_keepLast = 0;
 	int m_rIndexShown = 0;
-	SDL_mutex *m_mutex = nullptr;
+	std::unique_ptr<Mutex> m_mutex;
 	std::unique_ptr<Condition> m_cond;
 	PacketQueue &m_pktQ;
 };

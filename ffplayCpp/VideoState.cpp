@@ -21,6 +21,7 @@ extern "C" {
 #include "Thread.h"
 #include "Condition.h"
 #include "SwScaleContext.h"
+#include "Mutex.h"
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
@@ -825,11 +826,12 @@ retry:
 				m_frameTimer = time;
 			}
 
-			SDL_LockMutex(m_pictureQ.mutex());
+			m_pictureQ.lock();
 			if (!isnan(vp->pts())) {
 				updateVideoPts(vp->pts(), vp->pos(), vp->serial());
 			}
-			SDL_UnlockMutex(m_pictureQ.mutex());
+
+			m_pictureQ.unlock();
 
 			if (m_pictureQ.remaining() > 1) {
 				Frame *nextVp = m_pictureQ.peekNext();
@@ -1484,13 +1486,7 @@ int VideoState::runReadStream()
 	int origNbStreams;
 	int64_t pktTs;
 
-	SDL_mutex *waitMutex = SDL_CreateMutex();
-
-	if (!waitMutex) {
-		av_log(nullptr, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
-		ret = AVERROR(ENOMEM);
-		// TODO : handle error
-	}
+	Mutex waitMutex;
 
 	memset(stIndex, -1, sizeof(stIndex));
 
@@ -1738,9 +1734,10 @@ int VideoState::runReadStream()
 			(m_audioQ.hasEnoughPackets(m_audioSt, m_audioStream) &&
 				m_videoQ.hasEnoughPackets(m_videoSt, m_videoStream) &&
 				m_subtitleQ.hasEnoughPackets(m_subtitleSt, m_subtitleStream)))) {
-			SDL_LockMutex(waitMutex);
-			m_condReadThread->waitTimeout(*waitMutex, 10);
-			SDL_UnlockMutex(waitMutex);
+
+			waitMutex.lock();
+			m_condReadThread->waitTimeout(waitMutex, 10);
+			waitMutex.unlock();
 			continue;
 		}
 
@@ -1772,9 +1769,9 @@ int VideoState::runReadStream()
 			if (ic->pb && ic->pb->error) {
 				break;
 			}
-			SDL_LockMutex(waitMutex);
-			m_condReadThread->waitTimeout(*waitMutex, 10);
-			SDL_UnlockMutex(waitMutex);
+			waitMutex.lock();
+			m_condReadThread->waitTimeout(waitMutex, 10);
+			waitMutex.unlock();
 		}
 		else {
 			m_eof = 0;
@@ -1814,7 +1811,7 @@ fail:
 		SDL_PushEvent(&event);
 	}
 
-	SDL_DestroyMutex(waitMutex);
+	//SDL_DestroyMutex(waitMutex);
 	return 0;
 }
 

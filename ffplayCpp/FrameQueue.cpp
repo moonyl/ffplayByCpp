@@ -2,6 +2,7 @@
 #include <SDL.h>
 #include "PacketQueue.h"
 #include "Condition.h"
+#include "Mutex.h"
 
 void Frame::unref()
 {
@@ -15,9 +16,10 @@ void Frame::moveRef(AVFrame * frame)
 }
 
 FrameQueue::FrameQueue(PacketQueue & pktQ, int maxSize, int keepLast) :
-	m_pktQ(pktQ)
+	m_pktQ(pktQ),
+	m_mutex(std::make_unique<Mutex>())
 {
-	if (!(m_mutex = SDL_CreateMutex())) {
+	if (!m_mutex)	{
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
 		// TODO : throw exception
 	}
@@ -33,14 +35,13 @@ FrameQueue::FrameQueue(PacketQueue & pktQ, int maxSize, int keepLast) :
 
 FrameQueue::~FrameQueue()
 {
-	SDL_DestroyMutex(m_mutex);
 }
 
 void FrameQueue::signal()
 {
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	m_cond->signal();
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 }
 
 Frame * FrameQueue::peek()
@@ -60,11 +61,12 @@ Frame * FrameQueue::peekLast()
 
 Frame * FrameQueue::peekWritable()
 {
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	while (m_size >= m_maxSize && !m_pktQ.isAbortRequested()) {
-		m_cond->wait(*m_mutex);
+		m_cond->wait(*m_mutex);		
 	}
-	SDL_UnlockMutex(m_mutex);
+
+	m_mutex->unlock();
 
 	if (m_pktQ.isAbortRequested()) {
 		return nullptr;
@@ -75,11 +77,11 @@ Frame * FrameQueue::peekWritable()
 
 Frame * FrameQueue::peekReadable()
 {
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	while (m_size - m_rIndexShown <= 0 && !m_pktQ.isAbortRequested()) {
 		m_cond->wait(*m_mutex);
 	}
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 
 	if (m_pktQ.isAbortRequested()) {
 		return nullptr;
@@ -93,10 +95,10 @@ void FrameQueue::push()
 	if (++m_wIndex == m_maxSize) {
 		m_wIndex = 0;
 	}
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
 	m_size++;
 	m_cond->signal();
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 }
 
 void FrameQueue::next()
@@ -109,10 +111,11 @@ void FrameQueue::next()
 	if (++m_rIndex == m_maxSize) {
 		m_rIndex = 0;
 	}
-	SDL_LockMutex(m_mutex);
+	m_mutex->lock();
+
 	m_size--;
 	m_cond->signal();
-	SDL_UnlockMutex(m_mutex);
+	m_mutex->unlock();
 }
 
 int FrameQueue::rIndexShown() const
@@ -120,9 +123,14 @@ int FrameQueue::rIndexShown() const
 	return m_rIndexShown;
 }
 
-SDL_mutex * FrameQueue::mutex() const
+void FrameQueue::lock()
 {
-	return m_mutex;
+	m_mutex->lock();
+}
+
+void FrameQueue::unlock()
+{
+	m_mutex->unlock();
 }
 
 int FrameQueue::remaining() const

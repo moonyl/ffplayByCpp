@@ -3,6 +3,8 @@
 #include <memory>
 #include <SDL.h>
 
+class Mutex;
+
 class Condition
 {
 public:
@@ -11,8 +13,8 @@ public:
 
 public:
 	int signal();
-	int wait(SDL_mutex &mutex);
-	int waitTimeout(SDL_mutex &mutex, Uint32 milisec);
+	int wait(Mutex &mutex);
+	int waitTimeout(Mutex &mutex, Uint32 milisec);
 
 private:
 	struct SDLConditionDestroyer
