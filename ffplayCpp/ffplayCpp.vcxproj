@@ -160,6 +160,7 @@
     <ClInclude Include="Mutex.h" />
     <ClInclude Include="PacketQueue.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="SwResampleContext.h" />
     <ClInclude Include="SwScaleContext.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="VideoState.h" />
@@ -174,6 +175,7 @@
     <ClCompile Include="Mutex.cpp" />
     <ClCompile Include="PacketQueue.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="SwResampleContext.cpp" />
     <ClCompile Include="SwScaleContext.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="VideoState.cpp" />

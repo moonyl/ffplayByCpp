@@ -22,6 +22,7 @@ extern "C" {
 #include "Condition.h"
 #include "SwScaleContext.h"
 #include "Mutex.h"
+#include "SwResampleContext.h"
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 #define REFRESH_RATE	0.01
@@ -82,7 +83,8 @@ VideoState::VideoState(const char * filename, AVInputFormat * iformat) :
 	m_extClk(m_subtitleQ.serial()),
 	m_imgConvertCtx(std::make_unique<SwScaleContext>()),
 	m_subConvertCtx(std::make_unique<SwScaleContext>()),
-	m_readThread(std::make_unique<Thread>(readThread, "readThread", this))	
+	m_readThread(std::make_unique<Thread>(readThread, "readThread", this)),
+	m_swResampleCtx(std::make_unique<SwResampleContext>())
 {
 	if (!m_condReadThread) {
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
@@ -672,17 +674,9 @@ int VideoState::audioDecodeFrame()
 	if (af->frameFormat() != m_audioSrc.fmt ||
 		decChannelLayout != m_audioSrc.channelLayout ||
 		af->frame()->sample_rate != m_audioSrc.freq ||
-		(wantedNbSamples != af->nbSamples() && !m_swrCtx)) {
-		swr_free(&m_swrCtx);
-		m_swrCtx = swr_alloc_set_opts(nullptr,
-			m_audioTgt.channelLayout, m_audioTgt.fmt, m_audioTgt.freq,
-			decChannelLayout, af->frameFormat(), af->frame()->sample_rate, 0, nullptr);
-		if (!m_swrCtx || swr_init(m_swrCtx) < 0) {
-			av_log(nullptr, AV_LOG_ERROR,
-				"Cannot create sample rate converter for conversion of %d Hz %s %d channels to %d Hz %s %d channels!\n",
-				af->frame()->sample_rate, av_get_sample_fmt_name(af->frameFormat()), af->frame()->channels,
-				m_audioTgt.freq, av_get_sample_fmt_name(m_audioTgt.fmt), m_audioTgt.channels);
-			swr_free(&m_swrCtx);
+		(wantedNbSamples != af->nbSamples() && !m_swResampleCtx->isApplied())) {
+		if (m_swResampleCtx->applyOptionedContext(m_audioTgt.channelLayout, m_audioTgt.fmt, m_audioTgt.freq,
+			decChannelLayout, af->frameFormat(), af->frame()->sample_rate) < 0) {
 			return -1;
 		}
 		m_audioSrc.channelLayout = decChannelLayout;
@@ -691,7 +685,8 @@ int VideoState::audioDecodeFrame()
 		m_audioSrc.fmt = af->frameFormat();
 	}
 
-	if (m_swrCtx) {
+	if (m_swResampleCtx->isApplied())	{
+
 		const uint8_t **in = (const uint8_t **)af->frame()->extended_data;
 		uint8_t **out = &m_audioBuf1;
 		int outCount = (int64_t)wantedNbSamples * m_audioTgt.freq / af->frame()->sample_rate + 256;
@@ -702,7 +697,7 @@ int VideoState::audioDecodeFrame()
 			return -1;
 		}
 		if (wantedNbSamples != af->frame()->nb_samples) {
-			if (swr_set_compensation(m_swrCtx, (wantedNbSamples - af->frame()->nb_samples) * m_audioTgt.freq / af->frame()->sample_rate,
+			if (m_swResampleCtx->setCompensation((wantedNbSamples - af->frame()->nb_samples) * m_audioTgt.freq / af->frame()->sample_rate,
 				wantedNbSamples * m_audioTgt.freq / af->frame()->sample_rate) < 0) {
 				av_log(nullptr, AV_LOG_ERROR, "swr_set_compenstation() failed\n");
 				return -1;
@@ -712,15 +707,15 @@ int VideoState::audioDecodeFrame()
 		if (!m_audioBuf1) {
 			return AVERROR(ENOMEM);
 		}
-		len2 = swr_convert(m_swrCtx, out, outCount, in, af->frame()->nb_samples);
+		len2 = m_swResampleCtx->convert(out, outCount, in, af->frame()->nb_samples);
 		if (len2 < 0) {
 			av_log(nullptr, AV_LOG_ERROR, "swr_convert() failed\n");
 			return -1;
 		}
 		if (len2 == outCount) {
 			av_log(nullptr, AV_LOG_WARNING, "audio buffer is probably too small\n");
-			if (swr_init(m_swrCtx) < 0) {
-				swr_free(&m_swrCtx);
+			if (m_swResampleCtx->init() < 0) {
+				m_swResampleCtx.reset();
 			}
 		}
 		m_audioBuf = m_audioBuf1;

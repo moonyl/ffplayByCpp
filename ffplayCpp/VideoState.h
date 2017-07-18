@@ -24,6 +24,7 @@ class Window;
 class Thread;
 class Condition;
 class SwScaleContext;
+class SwResampleContext;
 
 // TODO : make this into class
 struct AudioParams {
@@ -260,7 +261,7 @@ private:	// members should be zero on creating
 	std::unique_ptr<SwScaleContext> m_subConvertCtx;
 	std::unique_ptr<SwScaleContext> m_imgConvertCtx;
 
-	SwrContext *m_swrCtx = nullptr;
+	std::unique_ptr<SwResampleContext> m_swResampleCtx;
 	double m_audioDiffCum;
 
 	unsigned int m_audioBuf1Size = 0;
