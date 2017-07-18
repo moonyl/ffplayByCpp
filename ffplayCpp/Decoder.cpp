@@ -47,7 +47,7 @@ int Decoder::decodeFrame(AVFrame * frame, AVSubtitle * sub)
 	for (;;) {
 		AVPacket pkt;
 
-		if (m_queue.serial() == m_pktSerial) {
+		if (m_queue.isSameSerial(m_pktSerial)) {
 			do {
 				if (m_queue.isAbortRequested()) {
 					return -1;
@@ -108,7 +108,7 @@ int Decoder::decodeFrame(AVFrame * frame, AVSubtitle * sub)
 					return -1;
 				}
 			}
-		} while (m_queue.serial() != m_pktSerial);
+		} while (!m_queue.isSameSerial(m_pktSerial));
 
 		if (PacketQueue::isFlushData(pkt.data)) {
 			avcodec_flush_buffers(m_avctx);

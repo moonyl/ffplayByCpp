@@ -4,10 +4,10 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/time.h>
 }
+#include "PacketQueue.h"
 
-
-Clock::Clock(const int &queueSerial) : 
-	m_queueSerial(queueSerial),
+Clock::Clock(PacketQueue &pQ) :
+	m_packetQ(pQ),
 	m_speed(1.0),
 	m_serial(0)
 {
@@ -20,8 +20,8 @@ Clock::~Clock()
 }
 
 double Clock::getClock() const
-{
-	if (m_queueSerial != m_serial) {
+{	
+	if (!m_packetQ.isSameSerial(m_serial))	{
 		return NAN;
 	}
 

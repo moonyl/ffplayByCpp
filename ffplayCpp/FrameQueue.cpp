@@ -141,7 +141,7 @@ int FrameQueue::remaining() const
 int64_t FrameQueue::lastPos() const
 {
 	const Frame &f = m_queue[m_rIndex];
-	if (m_rIndexShown && f.serial() == m_pktQ.serial()) {
+	if (m_rIndexShown && m_pktQ.isSameSerial(f.serial())) {
 		return f.pos();
 	}
 	else {

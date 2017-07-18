@@ -78,9 +78,9 @@ VideoState::VideoState(const char * filename, AVInputFormat * iformat) :
 	m_subPictureQ(m_subtitleQ, FrameQueue::SUBPICTURE_QUEUE_SIZE, 0),
 	m_sampleQ(m_audioQ, FrameQueue::SAMPLE_QUEUE_SIZE, 1),
 	m_condReadThread(std::make_unique<Condition>()),
-	m_audClk(m_audioQ.serial()),
-	m_vidClk(m_videoQ.serial()),
-	m_extClk(m_subtitleQ.serial()),
+	m_audClk(m_audioQ),
+	m_vidClk(m_videoQ),
+	m_extClk(m_subtitleQ),
 	m_imgConvertCtx(std::make_unique<SwScaleContext>()),
 	m_subConvertCtx(std::make_unique<SwScaleContext>()),
 	m_readThread(std::make_unique<Thread>(readThread, "readThread", this)),
@@ -664,7 +664,7 @@ int VideoState::audioDecodeFrame()
 			return -1;
 		}
 		m_sampleQ.next();
-	} while (af->serial() != m_audioQ.serial());
+	} while (!m_audioQ.isSameSerial(af->serial()));
 
 	dataSize = av_samples_get_buffer_size(nullptr, af->channels(), af->nbSamples(), af->frameFormat(), 1);
 	decChannelLayout = (af->channelLayout() && af->channels() == av_get_channel_layout_nb_channels(af->channelLayout()) ?
@@ -793,7 +793,7 @@ retry:
 			lastVp = m_pictureQ.peekLast();
 			vp = m_pictureQ.peek();
 
-			if (vp->serial() != m_videoQ.serial()) {
+			if (!m_videoQ.isSameSerial(vp->serial())) {
 				m_pictureQ.next();
 				goto retry;
 			}
@@ -850,7 +850,7 @@ retry:
 						sp2 = nullptr;
 					}
 
-					if (sp->serial() != m_subtitleQ.serial() ||
+					if (!m_subtitleQ.isSameSerial(sp->serial()) ||
 						(m_vidClk.pts() > (sp->pts() + ((float)sp->sub()->end_display_time / 1000))) ||
 						(sp2 && m_vidClk.pts() > (sp2->pts() + ((float)sp2->sub()->start_display_time / 1000)))) {
 						if (sp->uploaded()) {
@@ -1737,8 +1737,8 @@ int VideoState::runReadStream()
 		}
 
 		if (!m_paused &&
-			(!m_audioSt || (m_audDec->finished() == m_audioQ.serial() && m_sampleQ.remaining() == 0)) &&
-			(!m_videoSt || (m_vidDec->finished() == m_videoQ.serial() && m_pictureQ.remaining() == 0))) {
+			(!m_audioSt || m_audioQ.isSameSerial(m_audDec->finished() && m_sampleQ.remaining() == 0)) &&
+			(!m_videoSt || m_videoQ.isSameSerial(m_vidDec->finished() && m_pictureQ.remaining() == 0))) {
 			if (s_loop != 1 && (!s_loop || --s_loop)) {
 				seekStream(m_startTime != AV_NOPTS_VALUE ? m_startTime : 0, 0, 0);
 			}

@@ -23,9 +23,13 @@ public:
 	~PacketQueue();
 
 public:
+	bool isSameSerial(int serial) const {
+		return serial == m_serial;
+	}
+
+public:
 	int putPrivate(AVPacket *pkt);
-	bool isAbortRequested();
-	const int& serial() const { return m_serial; }
+	bool isAbortRequested();	
 	void start();
 	int nbPackets() const { return m_nbPackets; }
 	int get(AVPacket *pkt, int block, int *serial);

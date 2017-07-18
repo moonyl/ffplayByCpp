@@ -2,10 +2,11 @@
 #ifndef _CLOCK_H_
 #define _CLOCK_H_
 
+class PacketQueue;
 class Clock
 {
 public:
-	Clock(const int &queueSerial);
+	Clock(PacketQueue &pQ);
 	~Clock();
 
 public:
@@ -26,8 +27,8 @@ private:
 	double m_lastUpdated;
 	double m_speed;
 	int m_serial;
-	int m_paused;
-	const int &m_queueSerial;
+	int m_paused;	
+	PacketQueue &m_packetQ;
 	const double AV_NOSYNC_THRESHOLD = 10.0;
 };
 
