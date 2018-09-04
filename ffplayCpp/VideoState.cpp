@@ -2,6 +2,7 @@
 #include <SDL.h>
 #include "Clock.h"
 #include <cstdint>
+#include <string.h>
 
 extern "C" {
 #include <libavutil/avstring.h>
@@ -81,9 +82,9 @@ VideoState::VideoState(const char * filename, AVInputFormat * iformat) :
 	m_audClk(m_audioQ),
 	m_vidClk(m_videoQ),
 	m_extClk(m_subtitleQ),
-	m_imgConvertCtx(std::make_unique<SwScaleContext>()),
-	m_subConvertCtx(std::make_unique<SwScaleContext>()),
 	m_readThread(std::make_unique<Thread>(readThread, "readThread", this)),
+	m_subConvertCtx(std::make_unique<SwScaleContext>()),
+	m_imgConvertCtx(std::make_unique<SwScaleContext>()),
 	m_swResampleCtx(std::make_unique<SwResampleContext>())
 {
 	if (!m_condReadThread) {
@@ -272,9 +273,11 @@ static AVDictionary *filterCodecOpts(AVDictionary *opts, AVCodecID codecId, AVFo
 		prefix = 's';
 		flags |= AV_OPT_FLAG_SUBTITLE_PARAM;
 		break;
+	default:
+		break;
 	}
 
-	while (t = av_dict_get(opts, "", t, AV_DICT_IGNORE_SUFFIX)) {
+	while ( (t = av_dict_get(opts, "", t, AV_DICT_IGNORE_SUFFIX)) ) {
 		char *p = strchr(t->key, ':');
 
 		if (p) {
@@ -320,7 +323,7 @@ int VideoState::openStreamComponent(int streamIndex)
 	int ret = 0;
 	int streamLowres = s_lowres;
 	
-	if (streamIndex < 0 || streamIndex >= ic->nb_streams) {
+	if (streamIndex < 0 || (unsigned int)streamIndex >= ic->nb_streams) {
 		return -1;
 	}
 
@@ -350,6 +353,8 @@ int VideoState::openStreamComponent(int streamIndex)
 		m_lastVideoStream = streamIndex;
 		forcedCodecName = s_videoCodecName;
 		break;
+	default:
+		break;
 	}
 
 	if (forcedCodecName) {
@@ -368,6 +373,7 @@ int VideoState::openStreamComponent(int streamIndex)
 	}
 
 	avctx->codec_id = codec->id;
+#if FF_API_LOWRES
 	/**
 	 * low resolution decoding, 1-> 1/2 size, 2->1/4 size
 	 */
@@ -383,6 +389,8 @@ int VideoState::openStreamComponent(int streamIndex)
 		avctx->flags |= CODEC_FLAG_EMU_EDGE;
 	}
 #endif
+#endif
+
 	if (s_fast) {
 		avctx->flags2 |= AV_CODEC_FLAG2_FAST;
 #if FF_API_EMU_EDGE
@@ -854,8 +862,8 @@ retry:
 						(m_vidClk.pts() > (sp->pts() + ((float)sp->sub()->end_display_time / 1000))) ||
 						(sp2 && m_vidClk.pts() > (sp2->pts() + ((float)sp2->sub()->start_display_time / 1000)))) {
 						if (sp->uploaded()) {
-							int i;
-							for (i = 0; i < sp->sub()->num_rects; i++) {
+							unsigned int i;
+							for (i = 0; i < (sp->sub()->num_rects); i++) {
 								AVSubtitleRect *subRect = sp->sub()->rects[i];
 								uint8_t *pixels;
 								int pitch, j;
@@ -938,8 +946,8 @@ display:
 
 void VideoState::checkExternalClockSpeed()
 {
-	if (m_videoStream >= 0 && m_videoQ.nbPackets() <= EXTERNAL_CLOCK_MIN_FRAMES ||
-		m_audioStream >= 0 && m_audioQ.nbPackets() <= EXTERNAL_CLOCK_MIN_FRAMES) {
+	if ( ( ((m_videoStream >= 0) && (m_videoQ.nbPackets() <= EXTERNAL_CLOCK_MIN_FRAMES)) ) ||
+		((m_audioStream >= 0) && (m_audioQ.nbPackets() <= EXTERNAL_CLOCK_MIN_FRAMES)) ) {
 		m_extClk.setClockSpeed(FFMAX(EXTERNAL_CLOCK_SPEED_MIN, m_extClk.speed() - EXTERNAL_CLOCK_SPEED_STEP));
 	}
 	else if ((m_videoStream < 0 || m_videoQ.nbPackets() > EXTERNAL_CLOCK_MAX_FRAMES) &&
@@ -1202,7 +1210,7 @@ void VideoState::displayVideoImage()
 				if (!sp->uploaded()) {
 					uint8_t *pixels[4];
 					int pitch[4];
-					int i;
+					unsigned int i;
 					if (!m_width || !m_height) {
 						sp->setWidth(vp->width());
 						sp->setHeight(vp->height());
@@ -1212,7 +1220,7 @@ void VideoState::displayVideoImage()
 						return;
 					}
 
-					for (i = 0; i < sp->sub()->num_rects; i++) {
+					for (i = 0; (i < sp->sub()->num_rects); i++) {
 						AVSubtitleRect *subRect = sp->sub()->rects[i];
 
 						subRect->x = av_clip(subRect->x, 0, sp->width());
@@ -1265,13 +1273,13 @@ void VideoState::displayVideoImage()
 #if USE_ONEPASS_SUBTITLE_RENDER
 		SDL_RenderCopy(m_renderer, m_subTexture, nullptr, &rect);
 #else
-		int i;
+		unsigned int i;
 		double xRatio = (double)rect.w / (double)sp->width();
 		double yRatio = (double)rect.h / (double)sp->height();
 		for (i = 0; i < sp->sub()->num_rects; i++) {
 			SDL_Rect *subRect = (SDL_Rect*)sp->sub()->rects[i];
-			SDL_Rect target = { rect.x + subRect->x * xRatio,
-				rect.y + subRect->y * yRatio, subRect->w * xRatio, subRect->h * yRatio };
+			SDL_Rect target = { (int)(rect.x + subRect->x * xRatio),
+				(int)(rect.y + subRect->y * yRatio), (int)(subRect->w * xRatio), (int)(subRect->h * yRatio) };
 			m_renderer->copy(*m_subTexture, *subRect, target);
 		}
 #endif
@@ -1428,7 +1436,11 @@ static void printError(const char *filename, int err)
 
 	if (av_strerror(err, errBuf, sizeof(errBuf)) < 0) {
 		//errBufPtr = strerror(AVUNERROR(err));
+#ifdef _WIN32
 		strerror_s(errBuf, sizeof(errBuf), AVUNERROR(err));
+#else
+		strerror_r(AVUNERROR(err), errBuf, sizeof(errBuf));
+#endif
 	}
 	av_log(nullptr, AV_LOG_ERROR, "%s: %s\n", filename, errBufPtr);
 }
@@ -1451,17 +1463,17 @@ static AVDictionary **setupFoundStreamInfoOpts(AVFormatContext *s, AVDictionary 
 	return opts;
 }
 
-static bool isRealtime(AVFormatContext *ic)
+static bool isRealtime(AVFormatContext * ic, const char * filename)
 {
-	if (!strcmp(ic->iformat->name, "rtp") ||
-		!strcmp(ic->iformat->name, "rtsp") ||
-		!strcmp(ic->iformat->name, "sdp")) {
+	if (!strcmp(filename, "rtp") ||
+		!strcmp(filename, "rtsp") ||
+		!strcmp(filename, "sdp")) {
 		return true;
 	}
 
 	if (ic->pb &&
-		(!strncmp(ic->filename, "rtp:", 4) ||
-			!strncmp(ic->filename, "udp:", 4))) {
+		(!strncmp(filename, "rtp:", 4) ||
+			!strncmp(filename, "udp:", 4))) {
 		return true;
 	}
 	return false;
@@ -1470,7 +1482,8 @@ static bool isRealtime(AVFormatContext *ic)
 int VideoState::runReadStream()
 {
 	AVFormatContext *ic = nullptr;
-	int err, i, ret;
+	int err, ret;
+        unsigned int i;
 	int stIndex[AVMEDIA_TYPE_NB];
 	AVPacket pkt1, *pkt = &pkt1;
 	int64_t streamStartTime;
@@ -1478,7 +1491,7 @@ int VideoState::runReadStream()
 	int scanAllPmtsSet = 0;
 	AVDictionaryEntry *t;
 	AVDictionary **opts;
-	int origNbStreams;
+	unsigned int origNbStreams;
 	int64_t pktTs;
 
 	Mutex waitMutex;
@@ -1569,17 +1582,17 @@ int VideoState::runReadStream()
 	}
 
 	// TODO : read function
-	m_realtime = isRealtime(ic);
+	m_realtime = isRealtime(ic, m_filename);
 
 	if (m_showStatus) {
 		av_dump_format(ic, 0, m_filename, 0);	// what is stream? 
 	}
 
-	for (i = 0; i < ic->nb_streams; i++) {
+	for (i = 0; (i < ic->nb_streams); i++) {
 		AVStream *st = ic->streams[i];
 		AVMediaType type = st->codecpar->codec_type;
 		st->discard = AVDISCARD_ALL;
-		if (type >= 0 && m_wantedStreamSpec[type] && stIndex[type] == -1) {
+		if ( (type >= 0) && m_wantedStreamSpec[type] && (stIndex[type] == -1) ) {
 			if (avformat_match_stream_specifier(ic, st, m_wantedStreamSpec[type]) > 0) {
 				stIndex[type] = i;
 			}
@@ -1674,7 +1687,7 @@ int VideoState::runReadStream()
 
 			ret = avformat_seek_file(m_ic, -1, seekMin, seekTarget, seekMax, m_seekFlags);
 			if (ret < 0) {
-				av_log(nullptr, AV_LOG_ERROR, "%s: error while seeking\n", m_ic->filename);
+				av_log(nullptr, AV_LOG_ERROR, "%s: error while seeking\n", m_filename);
 			}
 			else {
 				if (m_audioStream >= 0) {
@@ -1707,7 +1720,7 @@ int VideoState::runReadStream()
 		if (m_queueAttachmentsReq) {
 			if (m_videoSt && m_videoSt->disposition & AV_DISPOSITION_ATTACHED_PIC) {
 				AVPacket copy;
-				if ((ret = av_copy_packet(&copy, &m_videoSt->attached_pic)) < 0) {
+				if ((ret = av_packet_ref(&copy, &m_videoSt->attached_pic)) < 0) {
 					// handle exception
 				}
 				m_videoQ.put(&copy);
@@ -1822,9 +1835,9 @@ int VideoState::decodeInterruptCb(void * ctx)
 	return is->m_abortRequest;
 }
 
-void VideoState::handleAudioCallback(Uint8 *stream, int len)
+void VideoState::handleAudioCallback(Uint8 *stream, unsigned int len)
 {
-	int audioSize, len1;
+	unsigned int audioSize, len1;
 
 	m_audioCallbackTime = av_gettime_relative();
 

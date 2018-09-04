@@ -20,7 +20,7 @@ int SwResampleContext::applyOptionedContext(int64_t outChannelLayout,
 		logOffset, logCtx);
 	if (!m_context || init() < 0) {
 		av_log(nullptr, AV_LOG_ERROR,
-			"Cannot create sample rate converter for conversion of %d Hz %s 0x%x channel layout to %d Hz %s 0x%x channel layout!\n",
+			"Cannot create sample rate converter for conversion of %d Hz %s 0x%lu channel layout to %d Hz %s 0x%lu channel layout!\n",
 			inSampleRate, av_get_sample_fmt_name(inFormat), inChannelLayout,
 			outSampleRate, av_get_sample_fmt_name(outFormat), outChannelLayout);
 		swr_free(&m_context);

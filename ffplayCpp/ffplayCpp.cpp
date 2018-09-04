@@ -41,10 +41,12 @@ void FfPlayCpp::openStream(const char * inputFile, AVInputFormat * inputFormat)
 void FfPlayCpp::eventLoop()
 {
 	SDL_Event event;
-	double incr, pos, frac;
+//	unused, causing warnings
+//	double incr, pos, frac;
 
 	for (;;) {
-		double x;
+//		unused, causing warnings
+//		double x;
 		m_videoState->refreshLoopWaitEvent(event);
 		switch (event.type) {
 		case SDL_QUIT:
@@ -67,9 +69,11 @@ void FfPlayCpp::init()
 	//"Last message repeated x times" messages
 	av_log_set_flags(AV_LOG_SKIP_REPEATED);
 
+#if LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58, 9, 100)
 	avdevice_register_all();
 	avfilter_register_all();
 	av_register_all();
+#endif
 	avformat_network_init();
 
 	signal(SIGINT, handleSigTerm);
@@ -176,9 +180,12 @@ static void show_help_demuxer()
 int main(int argc, char *args[])
 {
 	FfPlayCpp app;
+#ifdef _WIN32
 	const char* inputFile = "D:/video/your_free_time_subtitle.avi";
+#else
+	const char* inputFile = "samplevideo.mp4";
+#endif
 	//const char* inputFile = "D:/video/TheGirlWithTheDragonTattoo2009.sample.mkv";
-	//const char* inputFile = "D:/video/I_ll_Be_Yours.mp4";
 	//const char* inputFile = "http://169.56.73.204/hls/test.m3u8";
 	AVInputFormat *inputFormat = NULL;
 	app.openStream(inputFile, inputFormat);

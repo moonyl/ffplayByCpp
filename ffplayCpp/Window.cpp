@@ -1,6 +1,6 @@
 #include "Window.h"
 
-Window::Window(WindowConfig &config)	
+Window::Window(WindowConfig const &config)	
 {
 	int flags = SDL_WINDOW_SHOWN;
 	if (config.isFull) {

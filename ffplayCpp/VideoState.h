@@ -111,7 +111,7 @@ private:
 	void displayVideoImage();
 	int uploadTexture(SDL_Texture *tex, AVFrame *frame);
 	int runReadStream();
-	void handleAudioCallback(Uint8 *stream, int len);
+	void handleAudioCallback(Uint8 *stream, unsigned int len);
 	int runAudioDecoding();
 	int runVideoDecoding();
 	int runSubtitleDecoding();
@@ -212,7 +212,7 @@ private:	// members should be zero on creating
 	uint8_t *m_audioBuf = nullptr;
 	unsigned int m_audioBufSize = 0;
 	int m_audioWriteBufSize = 0;
-	int m_audioBufIndex = 0;
+	unsigned int m_audioBufIndex = 0;
 	int m_audioDiffAvgCount = 0;
 	double m_audioDiffThreshold = 0.0;
 	double m_audioDiffAvgCoef = 0.0;

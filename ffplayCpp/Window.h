@@ -16,7 +16,7 @@ public:
 	};
 
 public:
-	Window(WindowConfig &config);
+	Window(WindowConfig const &config);
 	~Window();
 
 private:

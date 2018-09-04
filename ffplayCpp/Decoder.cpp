@@ -5,11 +5,11 @@
 #include "Condition.h"
 
 Decoder::Decoder(AVCodecContext* avctx, PacketQueue &queue, Condition &emptyQueueCond) :
-	m_avctx(avctx),
 	m_queue(queue),
+	m_avctx(avctx),
 	m_emptyQueueCond(emptyQueueCond)
 {
-	memset(&m_pkt, sizeof(AVPacket), 0);
+	memset(&m_pkt, 0, sizeof(AVPacket));
 }
 
 
@@ -81,6 +81,8 @@ int Decoder::decodeFrame(AVFrame * frame, AVSubtitle * sub)
 							m_nextPtsTb = tb;
 						}
 					}
+					break;
+				default:
 					break;
 				}
 				if (ret == AVERROR_EOF) {

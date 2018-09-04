@@ -179,11 +179,11 @@ int PacketQueue::putNullPkt(int streamIndex)
 int PacketQueue::hasEnoughPackets(AVStream * st, int streamId)
 {
 	const int MIN_FRAMES = 25;
-	return streamId < 0 || 
+	return ( (streamId < 0) || 
 		m_abortRequest ||
 		(st->disposition & AV_DISPOSITION_ATTACHED_PIC) ||
-		m_nbPackets > MIN_FRAMES && 
-		(!m_duration || av_q2d(st->time_base) * m_duration > 1.0);
+		((m_nbPackets > MIN_FRAMES) && 
+		(!m_duration || av_q2d(st->time_base) * m_duration > 1.0) ));
 }
 
 bool PacketQueue::isFlushData(uint8_t *& data)

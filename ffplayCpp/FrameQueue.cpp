@@ -16,8 +16,8 @@ void Frame::moveRef(AVFrame * frame)
 }
 
 FrameQueue::FrameQueue(PacketQueue & pktQ, int maxSize, int keepLast) :
-	m_pktQ(pktQ),
-	m_mutex(std::make_unique<Mutex>())
+	m_mutex(std::make_unique<Mutex>()),
+	m_pktQ(pktQ)
 {
 	if (!m_mutex)	{
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());

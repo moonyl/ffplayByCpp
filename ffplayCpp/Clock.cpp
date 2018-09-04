@@ -7,9 +7,9 @@ extern "C" {
 #include "PacketQueue.h"
 
 Clock::Clock(PacketQueue &pQ) :
-	m_packetQ(pQ),
 	m_speed(1.0),
-	m_serial(0)
+	m_serial(0),
+	m_packetQ(pQ)
 {
 	setClock(NAN, -1);
 }
